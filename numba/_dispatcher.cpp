@@ -495,6 +495,15 @@ public:
 
 };
 
+static int
+Dispatcher_gc_clear(Dispatcher *self)
+{
+    Py_CLEAR(self->argnames);
+    Py_CLEAR(self->defargs);
+    // self->fallbackdef is a borrowed ref by design; do NOT Py_CLEAR it.
+    // self->functions holds borrowed PyObject* (see comment in Insert); do NOT DECREF here.
+    return 0;
+}
 
 static int
 Dispatcher_traverse(Dispatcher *self, visitproc visit, void *arg)
@@ -512,16 +521,6 @@ Dispatcher_dealloc(Dispatcher *self)
     (void)Dispatcher_gc_clear(self);         // break cycles on owned refs
     self->clear();                           // drops C++ vectors (no DECREF of borrowed refs)
     Py_TYPE(self)->tp_free((PyObject*)self);
-}
-
-static int
-Dispatcher_gc_clear(Dispatcher *self)
-{
-    Py_CLEAR(self->argnames);
-    Py_CLEAR(self->defargs);
-    // self->fallbackdef is a borrowed ref by design; do NOT Py_CLEAR it.
-    // self->functions holds borrowed PyObject* (see comment in Insert); do NOT DECREF here.
-    return 0;
 }
 
 static int
