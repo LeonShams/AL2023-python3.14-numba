@@ -517,11 +517,20 @@ Dispatcher_traverse(Dispatcher *self, visitproc visit, void *arg)
 static void
 Dispatcher_dealloc(Dispatcher *self)
 {
-    PyObject_GC_UnTrack((PyObject *)self);   // <-- IMPORTANT
-    (void)Dispatcher_gc_clear(self);         // break cycles on owned refs
-    self->clear();                           // drops C++ vectors (no DECREF of borrowed refs)
+    // only untrack if tracked
+#if PY_VERSION_HEX >= 0x03090000
+    if (PyObject_GC_IsTracked((PyObject *)self)) {
+        PyObject_GC_UnTrack((PyObject *)self);
+    }
+#else
+    PyObject_GC_UnTrack((PyObject *)self);  // older Pythons are lenient
+#endif
+
+    (void)Dispatcher_gc_clear(self);  // Py_CLEAR argnames/defargs (owned refs)
+    self->clear();                    // vector cleanup (borrowed refs)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
+
 
 static int
 Dispatcher_init(Dispatcher *self, PyObject *args, PyObject *kwds)
