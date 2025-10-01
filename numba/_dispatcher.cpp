@@ -555,6 +555,8 @@ Dispatcher_init(Dispatcher *self, PyObject *args, PyObject *kwds)
     self->fallbackdef = NULL;
     self->has_stararg = has_stararg;
     self->exact_match_required = exact_match_required;
+
+    PyObject_GC_Track((PyObject *)self);
     return 0;
 }
 
