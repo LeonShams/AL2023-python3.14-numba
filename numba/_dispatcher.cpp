@@ -499,19 +499,30 @@ public:
 static int
 Dispatcher_traverse(Dispatcher *self, visitproc visit, void *arg)
 {
+    Py_VISIT(self->argnames);
     Py_VISIT(self->defargs);
+    // Do not visit borrowed refs (fallbackdef/functions) to avoid touching non-owned objects.
     return 0;
 }
 
 static void
 Dispatcher_dealloc(Dispatcher *self)
 {
-    Py_XDECREF(self->argnames);
-    Py_XDECREF(self->defargs);
-    self->clear();
+    PyObject_GC_UnTrack((PyObject *)self);   // <-- IMPORTANT
+    (void)Dispatcher_gc_clear(self);         // break cycles on owned refs
+    self->clear();                           // drops C++ vectors (no DECREF of borrowed refs)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static int
+Dispatcher_gc_clear(Dispatcher *self)
+{
+    Py_CLEAR(self->argnames);
+    Py_CLEAR(self->defargs);
+    // self->fallbackdef is a borrowed ref by design; do NOT Py_CLEAR it.
+    // self->functions holds borrowed PyObject* (see comment in Insert); do NOT DECREF here.
+    return 0;
+}
 
 static int
 Dispatcher_init(Dispatcher *self, PyObject *args, PyObject *kwds)
@@ -1578,7 +1589,7 @@ static PyTypeObject DispatcherType = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, /* tp_flags*/
     "Dispatcher object",                         /* tp_doc */
     (traverseproc) Dispatcher_traverse,          /* tp_traverse */
-    0,                                           /* tp_clear */
+    (inquiry) Dispatcher_gc_clear,               /* tp_clear */
     0,                                           /* tp_richcompare */
     0,                                           /* tp_weaklistoffset */
     0,                                           /* tp_iter */
